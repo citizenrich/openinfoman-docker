@@ -1,130 +1,64 @@
-FROM ubuntu:latest
+FROM ubuntu:14.04
 
-RUN apt-get -qq update && apt-get -qqy upgrade
-
-RUN apt-get -y install software-properties-common python-software-properties inotify-tools debconf-utils
-RUN apt-get -y install git wget unzip default-jre openjdk-8-jre
-
-WORKDIR /root/basex
-
-RUN wget --quiet http://files.basex.org/releases/8.6.4/BaseX864.zip
-RUN unzip BaseX864.zip -d ~/
-RUN touch ~/basex/.basexhome
-RUN chmod 777 -R ~/basex
-RUN ln -s ~/basex/bin/basex /usr/local/bin
+RUN apt-get -qq update && apt-get -qqy upgrade && \
+apt-get -y install software-properties-common \
+python-software-properties inotify-tools debconf-utils && \
+apt-get -y install git wget unzip default-jre openjdk-7-jre php5
 
 WORKDIR /root
 
-RUN git clone https://github.com/openhie/openinfoman
+RUN wget http://files.basex.org/releases/8.5.3/BaseX853.zip
+RUN unzip BaseX853.zip
+RUN mkdir openinfoman
+RUN cp -R basex/* openinfoman/
+RUN cp basex/.basexhome openinfoman/
 
-RUN basex -Vc "REPO INSTALL http://files.basex.org/modules/expath/functx-1.0.xar"
-
-WORKDIR ./openinfoman/repo
-
-RUN basex -Vc "repo install csd_base_library.xqm"
-RUN basex -Vc "repo install csd_base_library_updating.xqm"
-RUN basex -Vc "repo install csd_base_stored_queries.xqm"
-RUN basex -Vc "repo install csd_webapp_config.xqm"
-RUN basex -Vc "repo install csd_webapp_ui.xqm"
-RUN basex -Vc "repo install csd_document_manager.xqm"
-RUN basex -Vc "repo install csd_load_sample_directories.xqm"
-RUN basex -Vc "repo install csd_query_updated_services.xqm"
-RUN basex -Vc "repo install csd_poll_service_directories.xqm"
-RUN basex -Vc "repo install csd_local_services_cache.xqm"
-RUN basex -Vc "repo install csd_merge_cached_services.xqm"
-RUN basex -Vc "repo install csr_processor.xqm"
-RUN basex -Vc "repo install svs_load_shared_value_sets.xqm"
+RUN mkdir openinfoman/repo-src
+RUN git clone https://github.com/openhie/openinfoman openinfomangh
+RUN cp openinfomangh/repo/* openinfoman/repo-src/
+RUN cp -R openinfomangh/resources openinfoman/
+RUN cp ~/openinfomangh/webapp/*xqm ~/openinfoman/webapp
+RUN mkdir -p ~/openinfoman/webapp/static
+RUN cp -R ~/openinfomangh/webapp/static/* ~/openinfoman/webapp/static
+RUN ln -s ~/openinfoman/bin/basex /usr/local/bin
 
 RUN basex -Vc "CREATE DATABASE provider_directory"
 
-RUN cp -a ~/openinfoman/webapp/*xqm ~/basex/webapp
-RUN mkdir -p ~/basex/webapp/static
-RUN cp -a ~/openinfoman/webapp/static/* ~/basex/webapp/static
+RUN echo "module namespace csd_webconf = 'https://github.com/openhie/openinfoman/csd_webconf';\n\
+declare variable \$csd_webconf:db :=  'provider_directory';\n\
+declare variable \$csd_webconf:baseurl :=  '';\n\
+declare variable \$csd_webconf:remote_services := ();\n\
+" > $HOME/openinfoman/repo-src/generated_openinfoman_webconfig.xqm
+
+RUN basex -Vc "REPO INSTALL http://files.basex.org/modules/expath/functx-1.0.xar"
+
+WORKDIR /root/openinfoman/repo-src
+RUN basex -Vc "repo install "generated_openinfoman_webconfig.xqm""
+
+# Change shell to bash to interpret array syntax
+SHELL ["/bin/bash", "-c"]
+
+RUN declare -a arr=("csd_webapp_ui.xqm" "csd_base_library.xqm" "csd_base_library_updating.xqm"   "csd_base_stored_queries.xqm"  "csd_document_manager.xqm"  "csd_load_sample_directories.xqm"  "csd_query_updated_services.xqm"  "csd_poll_service_directories.xqm"  "csd_local_services_cache.xqm"  "csd_merge_cached_services.xqm"  "csr_processor.xqm"  "svs_load_shared_value_sets.xqm"  "async_fake.xqm"); \
+for i in "${arr[@]}"; do basex -Vc "repo install $i"; done
+RUN basex -Vc "RUN $HOME/openinfoman/resources/scripts/init_db.xq"
+
+WORKDIR /root/openinfoman
+RUN declare -a arr=("stored_query_definitions/facility_search.xml" "stored_query_definitions/adhoc_search.xml" "stored_query_definitions/service_search.xml" "stored_query_definitions/organization_search.xml" "stored_query_definitions/provider_search.xml" "stored_query_definitions/modtimes.xml" "stored_updating_query_definitions/service_create.xml" "stored_updating_query_definitions/mark_duplicate.xml" "stored_updating_query_definitions/simple_merge.xml" "stored_updating_query_definitions/mark_potential_duplicate.xml" "stored_updating_query_definitions/delete_potential_duplicate.xml" "stored_updating_query_definitions/organization_create.xml" "stored_updating_query_definitions/provider_create.xml" "stored_updating_query_definitions/facility_create.xml" "stored_updating_query_definitions/delete_duplicate.xml" "stored_updating_query_definitions/merge_by_identifier.xml" "stored_updating_query_definitions/extract_hierarchy.xml");\
+for i in "${arr[@]}"; do resources/scripts/install_stored_function.php resources/$i; done
+
+WORKDIR /root/openinfoman/resources/shared_value_sets
+RUN declare -a arr=("1.3.6.1.4.1.21367.200.101" "1.3.6.1.4.1.21367.200.102" "1.3.6.1.4.1.21367.200.103" "1.3.6.1.4.1.21367.200.104" "1.3.6.1.4.1.21367.200.105" "1.3.6.1.4.1.21367.200.106" "1.3.6.1.4.1.21367.200.108" "1.3.6.1.4.1.21367.200.109" "1.3.6.1.4.1.21367.200.110" "2.25.1098910207106778371035457739371181056504702027035" "2.25.17331675369518445540420660603637128875763657" "2.25.18630021159349753613449707959296853730613166189051" "2.25.259359036081944859901459759453974543442705863430576" "2.25.265608663818616228188834890512310231251363785626032" "2.25.309768652999692686176651983274504471835.999.400" "2.25.309768652999692686176651983274504471835.999.401" "2.25.309768652999692686176651983274504471835.999.402" "2.25.309768652999692686176651983274504471835.999.403" "2.25.309768652999692686176651983274504471835.999.404" "2.25.309768652999692686176651983274504471835.999.405" "2.25.309768652999692686176651983274504471835.999.406" "2.25.9830357893067925519626800209704957770712560");\
+for i in "${arr[@]}"; do basex -q"import module namespace svs_lsvs = 'https://github.com/openhie/openinfoman/svs_lsvs';' (svs_lsvs:load($i))'" ; done
+
+# Temporary fix for bug
+WORKDIR /root/openinfoman/repo/com/github/openhie/openinfoman
+RUN sed -i "s|concat(file:current-dir() ,'../resources/shared_value_sets/')|file:resolve-path('resources/shared_value_sets/', file:current-dir())|" svs_lsvs.xqm
+
+SHELL ["/bin/sh", "-c"]
+
+# Must switch back to this dir or paths will fail
+WORKDIR /root/openinfoman
 
 EXPOSE 8984 8985 1984
 
-RUN mkdir -p ~/basex/resources/stored_query_definitions
-RUN mkdir -p ~/basex/resources/stored_updating_query_definitions
-RUN ln -sf ~/openinfoman/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-RUN ln -sf ~/openinfoman/resources/stored_updating_query_definitions/* ~/basex/resources/stored_updating_query_definitions
-
-RUN mkdir -p ~/basex/resources/shared_value_sets
-RUN ln -sf ~/openinfoman/resources/shared_value_sets/* ~/basex/resources/shared_value_sets
-
-RUN mkdir -p ~/basex/resources/service_directories
-RUN ln -sf ~/openinfoman/resources/service_directories/* ~/basex/resources/service_directories
-
-RUN mkdir -p ~/basex/resources/test_docs
-# likely to be deprecated
-RUN ln -sf ~/openinfoman/resources/test_docs/* ~/basex/resources/test_docs
-
-RUN ln -sf ~/openinfoman/resources/SVS.xsd ~/basex/resources/
-RUN ln -sf ~/openinfoman/resources/CSD.xsd ~/basex/resources/
-RUN ln -sf ~/openinfoman/resources/doc_careServiceFunctions.xsl ~/basex/resources/
-
-# install packages
-
-# openinfoman-hwr
-WORKDIR /root
-RUN git clone https://github.com/openhie/openinfoman-hwr
-RUN ln -sf ~/openinfoman-hwr/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-RUN ln -sf ~/openinfoman-hwr/resources/stored_updating_query_definitions/* ~/basex/resources/stored_updating_query_definitions
-
-# openinfoman-csv
-RUN git clone https://github.com/openhie/openinfoman-csv
-WORKDIR /root/openinfoman-csv/repo
-RUN basex -Vc "REPO INSTALL openinfoman_csv_adapter.xqm"
-
-# opeinfoman-ldif
-
-# error
-# Stopped at /root/basex/webapp/openinfoman_ldif_adapter_bindings.xqm, 113/29:
-# [XPST0017] Unknown function: Q{https://github.com/openhie/openinfoman/csd_webconf}wrapper (similar: Q{http://basex.org/modules/web-page}wrapper).
-
-# WORKDIR /root
-# RUN git clone https://github.com/openhie/openinfoman-ldif
-# WORKDIR /root/openinfoman-ldif/repo
-# RUN basex -Vc "REPO INSTALL openinfoman_ldif_adapter.xqm"
-# RUN ln -sf ~/openinfoman-ldif/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-# RUN ln -s ~/openinfoman-ldif/webapp/openinfoman_ldif_adapter_bindings.xqm ~/basex/webapp/
-
-# openinfoman-r
-
-# error: Stopped at /root/basex/webapp/openinfoman_r_adapter_bindings.xqm, 56/30:
-# [XPST0017] Unknown function: Q{https://github.com/openhie/openinfoman/csd_webconf}wrapper.
-
-# WORKDIR /root
-# RUN git clone https://github.com/openhie/openinfoman-r
-# WORKDIR /root/openinfoman-r/repo
-# RUN basex -Vc "REPO INSTALL openinfoman_r_adapter.xqm"
-# RUN ln -sf ~/openinfoman-r/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-# RUN ln -s ~/openinfoman-r/webapp/openinfoman_r_adapter_bindings.xqm ~/basex/webapp/
-
-# openinfoman-dhis2
-WORKDIR /root
-RUN git clone https://github.com/openhie/openinfoman-dhis
-WORKDIR /root/openinfoman-dhis/repo
-RUN basex -Vc "REPO INSTALL dxf_1_0.xqm"
-RUN basex -Vc "REPO INSTALL dxf2csd.xqm "
-RUN ln -sf ~/openinfoman-dhis/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-RUN ln -sf ~/openinfoman-dhis/resources/stored_updating_query_definitions/* ~/basex/resources/stored_updating_query_definitions
-RUN ln -sf ~/openinfoman-dhis/webapp/openinfoman_dhis2_bindings.xqm ~/basex/webapp
-RUN ln -s ~/openinfoman-dhis/resources/service_directories/* ~/basex/resources/service_directories/
-
-# openinfomab-fhir
-
-# error: Java function org.intrahealth.hapi_transformer:new#0 is unknown
-
-# WORKDIR /root
-# RUN git clone https://github.com/openhie/openinfoman-fhir
-# WORKDIR /root/openinfoman-fhir/repo
-# RUN basex -Vc "REPO INSTALL openinfoman_fhir_adapter.xqm"
-# RUN ln -sf ~/openinfoman-fhir/resources/stored_query_definitions/* ~/basex/resources/stored_query_definitions
-# RUN ln -sf ~/openinfoman-fhir/webapp/openinfoman_fhir_bindings.xqm ~/basex/webapp
-
-
-# can bash into container and use the usual if uncommenting entrypoint
-# cd ~/basex/bin && ./basexhttp &
-
-ENTRYPOINT ["/root/basex/bin/basexhttp"]
-# CMD ["/root/basex/bin/basexhttp", "-d"] <- for debugging
+ENTRYPOINT ["/root/openinfoman/bin/basexhttp"]
