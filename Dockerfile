@@ -50,10 +50,8 @@ WORKDIR /root/openinfoman/resources/shared_value_sets
 RUN declare -a arr=("1.3.6.1.4.1.21367.200.101" "1.3.6.1.4.1.21367.200.102" "1.3.6.1.4.1.21367.200.103" "1.3.6.1.4.1.21367.200.104" "1.3.6.1.4.1.21367.200.105" "1.3.6.1.4.1.21367.200.106" "1.3.6.1.4.1.21367.200.108" "1.3.6.1.4.1.21367.200.109" "1.3.6.1.4.1.21367.200.110" "2.25.1098910207106778371035457739371181056504702027035" "2.25.17331675369518445540420660603637128875763657" "2.25.18630021159349753613449707959296853730613166189051" "2.25.259359036081944859901459759453974543442705863430576" "2.25.265608663818616228188834890512310231251363785626032" "2.25.309768652999692686176651983274504471835.999.400" "2.25.309768652999692686176651983274504471835.999.401" "2.25.309768652999692686176651983274504471835.999.402" "2.25.309768652999692686176651983274504471835.999.403" "2.25.309768652999692686176651983274504471835.999.404" "2.25.309768652999692686176651983274504471835.999.405" "2.25.309768652999692686176651983274504471835.999.406" "2.25.9830357893067925519626800209704957770712560");\
 for i in "${arr[@]}"; do basex -q"import module namespace svs_lsvs = 'https://github.com/openhie/openinfoman/svs_lsvs';' (svs_lsvs:load($i))'" ; done
 
-# Temporary fix for bug
-WORKDIR /root/openinfoman/repo/com/github/openhie/openinfoman
-RUN sed -i "s|concat(file:current-dir() ,'../resources/shared_value_sets/')|file:resolve-path('resources/shared_value_sets/', file:current-dir())|" svs_lsvs.xqm
-RUN sed -i 's|concat(file:current-dir() ,"../resources/service_directories/")|file:resolve-path("resources/service_directories/", file:current-dir())|' csd_lsd.xqm
+### openinfoman-csv
+
 SHELL ["/bin/sh", "-c"]
 
 WORKDIR /root
@@ -63,7 +61,7 @@ RUN basex -Vc "REPO INSTALL openinfoman_csv_adapter.xqm"
 # this may not be needed
 RUN cp ~/openinfoman-csv/webapp/*xqm ~/openinfoman/webapp
 
-### opeinfoman-rapidpro
+### openinfoman-rapidpro
 
 WORKDIR /root
 RUN git clone https://github.com/openhie/openinfoman-rapidpro
@@ -77,12 +75,16 @@ for i in "${arr[@]}"; do resources/scripts/install_stored_function.php resources
 SHELL ["/bin/sh", "-c"]
 RUN cp ~/openinfoman-rapidpro/webapp/openinfoman_rapidpro_bindings.xqm ~/openinfoman/webapp
 
+### openinfoman-ilr
+
 WORKDIR /root
 RUN git clone https://github.com/openhie/openinfoman-ilr
 RUN cp ~/openinfoman-ilr/resources/stored_query_definitions/* ~/openinfoman/resources/stored_query_definitions
 
 WORKDIR /root/openinfoman
 RUN resources/scripts/install_stored_function.php resources/stored_query_definitions/validate_provider_facility_service.xml
+
+### openinfoman-hwr
 
 WORKDIR /root
 RUN git clone https://github.com/openhie/openinfoman-hwr
@@ -115,7 +117,7 @@ RUN cp ~/openinfoman-dhis/webapp/openinfoman_dhis2_bindings.xqm ~/openinfoman/we
 RUN cp -R ~/openinfoman-dhis/resources/service_directories/* ~/openinfoman/resources/service_directories/
 
 # Must switch back to this dir or paths will fail
-WORKDIR /root/openinfoman
+WORKDIR /root/openinfoman/bin
 
 EXPOSE 8984 8985 1984
 
