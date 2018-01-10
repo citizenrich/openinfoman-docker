@@ -7,7 +7,12 @@ This builds [OpenInfoMan](https://github.com/openhie/openinfoman) and additional
 + [Inter-Linked Health Worker Registry Validation](https://github.com/openhie/openinfoman-ilr)
 + [DHIS2](https://github.com/openhie/openinfoman-dhis)
 
-To use, just clone the repo and build the file.
+To use, just pull the image from Docker Hub and run it.
+```
+docker run -d -p 8984:8984 openhie/openinfoman
+```
+
+Or, clone the repo and build the file.
 ```
 git clone https://github.com/citizenrich/openinfoman-docker
 cd openinfoman-docker
