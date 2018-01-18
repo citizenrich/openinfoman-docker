@@ -1,5 +1,7 @@
 ### Dockerfile for OpenInfoMan
 
+> [This repo is moved to github.com/openhie/openinfoman/master/packaging/docker]
+
 This builds [OpenInfoMan](https://github.com/openhie/openinfoman) and additional libraries for:
 + [Configurable Export to CSV](https://github.com/openhie/openinfoman-csv)
 + [RapidPro](https://github.com/openhie/openinfoman-rapidpro)
